@@ -1,5 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { doc, onSnapshot, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import {
+  doc,
+  onSnapshot,
+  setDoc,
+  updateDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 import { db } from "../firebaseConfig";
 
 /**
@@ -9,6 +15,9 @@ import { db } from "../firebaseConfig";
 const EstadoTiendaGate = ({ children }) => {
   const [estadoTienda, setEstadoTienda] = useState(null); // null = cargando
   const [error, setError] = useState(null);
+
+  // NUEVO: controlar visibilidad de la barra
+  const [mostrarBarra, setMostrarBarra] = useState(true);
 
   const refTienda = doc(db, "config", "tienda");
 
@@ -28,14 +37,17 @@ const EstadoTiendaGate = ({ children }) => {
         }
 
         const data = snap.data() || {};
-        // Default: true si no viene
-        setEstadoTienda(typeof data.estadoTienda === "boolean" ? data.estadoTienda : true);
+        setEstadoTienda(
+          typeof data.estadoTienda === "boolean"
+            ? data.estadoTienda
+            : true
+        );
         setError(null);
       },
       (e) => {
         console.error("Error estado tienda:", e);
         setError("No se pudo leer el estado de la tienda.");
-        setEstadoTienda(true); // fallback: no bloquear cocina
+        setEstadoTienda(true); // fallback
       }
     );
 
@@ -50,7 +62,7 @@ const EstadoTiendaGate = ({ children }) => {
       });
     } catch (e) {
       console.error(e);
-      alert("No se pudo cerrar la tienda. Revisa conexión/Firestore.");
+      alert("No se pudo cerrar la tienda.");
     }
   };
 
@@ -63,7 +75,7 @@ const EstadoTiendaGate = ({ children }) => {
       );
     } catch (e) {
       console.error(e);
-      alert("No se pudo abrir la tienda. Revisa conexión/Firestore.");
+      alert("No se pudo abrir la tienda.");
     }
   };
 
@@ -95,7 +107,7 @@ const EstadoTiendaGate = ({ children }) => {
 
           <button
             onClick={abrirTienda}
-            className="w-full py-3 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-black font-extrabold text-lg active:scale-[0.98]"
+            className="w-full py-3 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-black font-extrabold text-lg"
           >
             Abrir tienda
           </button>
@@ -104,24 +116,45 @@ const EstadoTiendaGate = ({ children }) => {
     );
   }
 
-  // Vista NORMAL (tienda abierta) + botón para cerrar
+  // Vista NORMAL (tienda abierta)
   return (
-    <div className="min-h-screen">
-      <div className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur border-b border-slate-800 px-4 py-3 flex items-center justify-between">
-        <div className="text-white font-bold">
-          Estado: <span className="text-emerald-300">Abierta</span>
+    <div className="min-h-screen relative">
+      {/* BARRA SUPERIOR */}
+      {mostrarBarra ? (
+        <div className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur border-b border-slate-800 px-4 py-2 flex items-center justify-between">
+          <div className="text-white font-bold">
+            Estado: <span className="text-emerald-300">Abierta</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setMostrarBarra(false)}
+              className="px-3 py-1 rounded-lg bg-slate-700 text-white text-sm"
+            >
+              Ocultar
+            </button>
+
+            <button
+              onClick={cerrarTienda}
+              className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-400 text-black font-extrabold flex items-center gap-2"
+            >
+              <span className="text-xl">😢</span>
+              Cerrar tienda
+            </button>
+          </div>
         </div>
-
+      ) : (
+        // BOTÓN FLOTANTE
         <button
-          onClick={cerrarTienda}
-          className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-400 text-black font-extrabold flex items-center gap-2 active:scale-[0.98]"
-          title="Cerrar tienda"
+          onClick={() => setMostrarBarra(true)}
+          className="fixed top-3 right-3 z-50 w-12 h-12 rounded-full bg-red-500 hover:bg-red-400 text-black text-xl shadow-2xl"
+          title="Mostrar control de tienda"
         >
-          <span className="text-xl">😢</span>
-          Tienda cerrada
+          😢
         </button>
-      </div>
+      )}
 
+      {/* CONTENIDO */}
       {children}
     </div>
   );
