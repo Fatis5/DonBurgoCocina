@@ -25,12 +25,13 @@ const normalizarMetodoPago = (p) => {
   return { key: raw, label: raw.charAt(0).toUpperCase() + raw.slice(1) };
 };
 
-// Filtra pedidos por rango de tiempo
-const filtrarPorRango = (pedidos, filtro) => {
+// Filtra pedidos por rango de tiempo o rango de fechas personalizado
+const filtrarPorRango = (pedidos, filtro, fechaDesdeStr, fechaHastaStr) => {
   if (filtro === "todo") return pedidos;
 
   const ahora = new Date();
-  let desde;
+  let desde = null;
+  let hasta = ahora;
 
   if (filtro === "hoy") {
     desde = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
@@ -38,18 +39,87 @@ const filtrarPorRango = (pedidos, filtro) => {
     desde = new Date(ahora.getTime() - 7 * 24 * 60 * 60 * 1000);
   } else if (filtro === "mes") {
     desde = new Date(ahora.getTime() - 30 * 24 * 60 * 60 * 1000);
+  } else if (filtro === "rango") {
+    // rango personalizado con calendario
+    if (!fechaDesdeStr && !fechaHastaStr) return pedidos;
+
+    if (fechaDesdeStr) {
+      desde = new Date(`${fechaDesdeStr}T00:00:00`);
+    } else {
+      // si no hay "desde", que sea muy antiguo
+      desde = new Date(0);
+    }
+
+    if (fechaHastaStr) {
+      hasta = new Date(`${fechaHastaStr}T23:59:59`);
+    } else {
+      hasta = ahora;
+    }
   }
 
   return pedidos.filter((p) => {
     const f = getFechaJS(p);
     if (!f) return false;
-    return f >= desde && f <= ahora;
+    if (desde && f < desde) return false;
+    if (hasta && f > hasta) return false;
+    return true;
   });
 };
 
+// Intenta leer el total del pedido de distintos campos posibles
+// Intenta leer el total del pedido o lo calcula desde el carrito
+const getTotalPedido = (p) => {
+  // 1) Si ya tienes algún total guardado en el documento, úsalo
+  const posiblesCamposTotal = [
+    p.total,
+    p.totalPagar,
+    p.totalPedido,
+    p.totalPedidoConDescuento,
+  ];
+
+  for (const valor of posiblesCamposTotal) {
+    const n = Number(valor);
+    if (!Number.isNaN(n) && n > 0) {
+      return n;
+    }
+  }
+
+  // 2) Si no hay total guardado, lo calculamos desde el carrito
+  const items = p.nuevoCarrito || p.carrito || [];
+  const subtotal = items.reduce((acc, it) => {
+    const precio = Number(it.precio || 0);
+    const cantidad = Number(it.cantidad || 1);
+
+    if (Number.isNaN(precio) || Number.isNaN(cantidad)) return acc;
+    return acc + precio * cantidad;
+  }, 0);
+
+  // Sumamos costo de envío si existe
+  const envio = Number(p.costoEnvio || 0);
+  const envioSeguro = Number.isNaN(envio) ? 0 : envio;
+
+  return subtotal + envioSeguro;
+};
+
+
+// Formato moneda MXN
+const currency = (n = 0) =>
+  Number(n).toLocaleString("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    minimumFractionDigits: 0,
+  });
+
 const ModalPedidosListos = ({ pedidos = [], onClose }) => {
-  const [filtro, setFiltro] = useState("hoy"); // "hoy" | "semana" | "mes" | "todo"
-  const [pedidoDetalle, setPedidoDetalle] = useState(null); // 👈 nuevo modal detalle
+  const [filtro, setFiltro] = useState("hoy"); // "hoy" | "semana" | "mes" | "todo" | "rango"
+  const [pedidoDetalle, setPedidoDetalle] = useState(null); // modal detalle de 1 pedido
+
+  // rango personalizado
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
+
+  // modal resumen por método de pago
+  const [metodoSeleccionado, setMetodoSeleccionado] = useState(null); // { id, label } o null
 
   // Calculamos totales y estadísticas según el filtro
   const {
@@ -59,7 +129,14 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
     statsProductos,
     resumenMetodos,
   } = useMemo(() => {
-    const filtrados = filtrarPorRango(pedidos, filtro);
+    // sólo pedidos listos / entregados (status 2 y 3)
+    const soloListos = pedidos.filter((p) => {
+      const s = String(p.status).toLowerCase();
+      return s === "2" || s === "3" || s === "listo";
+    });
+
+    // se filtra por rango (hoy, semana, mes, todo, rango personalizado)
+    const filtrados = filtrarPorRango(soloListos, filtro, fechaDesde, fechaHasta);
 
     let totalProd = 0;
     const mapProductos = new Map();
@@ -118,13 +195,66 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
       statsProductos: stats,
       resumenMetodos: resumenMetodosArr,
     };
-  }, [pedidos, filtro]);
+  }, [pedidos, filtro, fechaDesde, fechaHasta]);
+
+  // resumen detallado para el método seleccionado
+  const resumenMetodoSeleccionado = useMemo(() => {
+    if (!metodoSeleccionado) return null;
+
+    // repetimos la lógica base: status 2/3 + rango de fecha
+    const soloListos = pedidos.filter((p) => {
+      const s = String(p.status).toLowerCase();
+      return s === "2" || s === "3" || s === "listo";
+    });
+    const filtrados = filtrarPorRango(soloListos, filtro, fechaDesde, fechaHasta);
+
+    const pedidosMetodo = filtrados.filter(
+      (p) => normalizarMetodoPago(p).key === metodoSeleccionado.id
+    );
+
+    let totalProd = 0;
+    let totalMonto = 0;
+    const mapProductos = new Map();
+
+    pedidosMetodo.forEach((p) => {
+      const items = p.nuevoCarrito || p.carrito || [];
+      totalMonto += getTotalPedido(p);
+
+      items.forEach((it) => {
+        const key =
+          (it.handle || it.nombre || "Producto sin nombre").toLowerCase();
+        const cantidad = it.cantidad || 1;
+        totalProd += cantidad;
+
+        const previo = mapProductos.get(key) || {
+          id: key,
+          nombre: key,
+          cantidad: 0,
+        };
+        previo.cantidad += cantidad;
+        mapProductos.set(key, previo);
+      });
+    });
+
+    const productos = Array.from(mapProductos.values()).sort(
+      (a, b) => b.cantidad - a.cantidad
+    );
+
+    return {
+      pedidos: pedidosMetodo,
+      totalPedidos: pedidosMetodo.length,
+      totalProductos: totalProd,
+      totalMonto,
+      productos,
+    };
+  }, [metodoSeleccionado, pedidos, filtro, fechaDesde, fechaHasta]);
 
   const filtros = [
     { id: "hoy", label: "Hoy" },
     { id: "semana", label: "Últimos 7 días" },
     { id: "mes", label: "Últimos 30 días" },
     { id: "todo", label: "Todo" },
+    { id: "rango", label: "Por fecha" }, // 👈 nuevo
   ];
 
   const formatearFechaCorta = (p) => {
@@ -163,7 +293,7 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
         <div className="flex items-start justify-between px-5 pt-4 pb-2 border-b border-slate-700/70">
           <div>
             <h2 className="text-xl md:text-2xl font-extrabold text-white">
-              Pedidos listos (status = 2)
+              Pedidos listos (status = 2 y 3)
             </h2>
             <p className="text-xs md:text-sm text-slate-300">
               Resumen de productos vendidos y métodos de pago.
@@ -178,20 +308,49 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
         </div>
 
         {/* FILTROS */}
-        <div className="px-5 pt-3 pb-2 border-b border-slate-800 flex flex-wrap gap-2">
-          {filtros.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setFiltro(f.id)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${
-                filtro === f.id
-                  ? "bg-emerald-500 text-black border-emerald-400"
-                  : "bg-slate-800 text-slate-200 border-slate-600 hover:bg-slate-700"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
+        <div className="px-5 pt-3 pb-2 border-b border-slate-800 flex flex-col gap-2">
+          <div className="flex flex-wrap gap-2">
+            {filtros.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFiltro(f.id)}
+                className={`px-3 py-1 rounded-full text-xs font-semibold border transition ${
+                  filtro === f.id
+                    ? "bg-emerald-500 text-black border-emerald-400"
+                    : "bg-slate-800 text-slate-200 border-slate-600 hover:bg-slate-700"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 📅 Inputs de rango personalizado */}
+          {filtro === "rango" && (
+            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-200">
+              <div className="flex items-center gap-1">
+                <span className="text-slate-300">Desde:</span>
+                <input
+                  type="date"
+                  className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  value={fechaDesde}
+                  onChange={(e) => setFechaDesde(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-slate-300">Hasta:</span>
+                <input
+                  type="date"
+                  className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  value={fechaHasta}
+                  onChange={(e) => setFechaHasta(e.target.value)}
+                />
+              </div>
+              <span className="text-[11px] text-slate-400">
+                Si no seleccionas ambas fechas, se usa sólo la que esté llena.
+              </span>
+            </div>
+          )}
         </div>
 
         {/* RESUMEN GLOBAL */}
@@ -214,9 +373,10 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
           ) : (
             <div className="flex flex-wrap gap-2">
               {resumenMetodos.map((m) => (
-                <div
+                <button
                   key={m.id}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-600 text-xs md:text-sm"
+                  onClick={() => setMetodoSeleccionado(m)}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-600 text-xs md:text-sm text-left cursor-pointer hover:border-emerald-400 hover:bg-slate-700 transition"
                 >
                   <p className="font-semibold">{m.label}</p>
                   <p>
@@ -225,7 +385,10 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
                   <p>
                     Productos: <b>{m.totalProductos}</b>
                   </p>
-                </div>
+                  <p className="mt-0.5 text-[10px] text-emerald-300 uppercase">
+                    Click para ver detalle
+                  </p>
+                </button>
               ))}
             </div>
           )}
@@ -428,6 +591,123 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
                 className="ml-auto block px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-sm font-semibold text-black"
               >
                 Cerrar detalle
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL RESUMEN POR MÉTODO DE PAGO */}
+      {metodoSeleccionado && resumenMetodoSeleccionado && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="bg-slate-900 rounded-2xl shadow-2xl border border-emerald-500/70 max-w-lg w-full mx-4 max-h-[85vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-start justify-between px-5 pt-4 pb-2 border-b border-slate-800">
+              <div>
+                <p className="text-xs text-emerald-300 uppercase font-semibold">
+                  Resumen por método de pago
+                </p>
+                <p className="text-lg font-bold">
+                  {metodoSeleccionado.label}
+                </p>
+                <p className="text-xs text-slate-400">
+                  {filtro === "hoy"
+                    ? "Hoy"
+                    : filtro === "semana"
+                    ? "Últimos 7 días"
+                    : filtro === "mes"
+                    ? "Últimos 30 días"
+                    : filtro === "rango"
+                    ? "Rango personalizado"
+                    : "Todo el historial"}
+                </p>
+              </div>
+              <button
+                onClick={() => setMetodoSeleccionado(null)}
+                className="ml-3 mt-1 text-slate-300 hover:text-white"
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            {/* Contenido */}
+            <div className="flex-1 overflow-auto px-5 py-3 text-sm text-slate-100 space-y-3">
+              <div className="flex flex-wrap gap-3 text-xs md:text-sm">
+                <div className="px-3 py-2 bg-slate-800 rounded-xl border border-slate-700">
+                  <p className="text-slate-400 text-[11px] uppercase">
+                    Pedidos
+                  </p>
+                  <p className="text-base font-bold">
+                    {resumenMetodoSeleccionado.totalPedidos}
+                  </p>
+                </div>
+                <div className="px-3 py-2 bg-slate-800 rounded-xl border border-slate-700">
+                  <p className="text-slate-400 text-[11px] uppercase">
+                    Productos
+                  </p>
+                  <p className="text-base font-bold">
+                    {resumenMetodoSeleccionado.totalProductos}
+                  </p>
+                </div>
+                <div className="px-3 py-2 bg-emerald-600/20 rounded-xl border border-emerald-400">
+                  <p className="text-emerald-300 text-[11px] uppercase">
+                    Total vendido
+                  </p>
+                  <p className="text-base font-extrabold text-emerald-200">
+                    {currency(resumenMetodoSeleccionado.totalMonto)}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-400 uppercase mb-1">
+                  Productos vendidos por {metodoSeleccionado.label}
+                </p>
+                {resumenMetodoSeleccionado.productos.length === 0 ? (
+                  <p className="text-xs text-slate-500">
+                    No hay productos en este período para este método.
+                  </p>
+                ) : (
+                  <div className="bg-slate-950/60 rounded-xl border border-slate-800 max-h-[220px] overflow-auto">
+                    <table className="w-full text-xs">
+                      <thead className="sticky top-0 bg-slate-900">
+                        <tr>
+                          <th className="text-left px-3 py-2 text-[11px] text-slate-400">
+                            Producto
+                          </th>
+                          <th className="text-right px-3 py-2 text-[11px] text-slate-400">
+                            Cantidad
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {resumenMetodoSeleccionado.productos.map((prod) => (
+                          <tr
+                            key={prod.id}
+                            className="border-t border-slate-800/70"
+                          >
+                            <td className="px-3 py-1.5">
+                              {prod.nombre.replace(/-/g, " ").toUpperCase()}
+                            </td>
+                            <td className="px-3 py-1.5 text-right font-bold">
+                              {prod.cantidad}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 pb-4 pt-2 border-t border-slate-800">
+              <button
+                onClick={() => setMetodoSeleccionado(null)}
+                className="ml-auto block px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-sm font-semibold text-black"
+              >
+                Cerrar resumen
               </button>
             </div>
           </div>

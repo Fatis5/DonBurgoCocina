@@ -1,4 +1,3 @@
-// src/Screens/ListaPedidos.jsx
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { FaCheck } from "react-icons/fa";
 import {
@@ -37,7 +36,7 @@ const ListaPedidos = () => {
   // cuántos productos caben de arriba a abajo en una columna
   const [itemsPerCol, setItemsPerCol] = useState(8);
 
-  // 🎵 controlar audio según alarmaActiva
+  // controlar audio según alarmaActiva
   useEffect(() => {
     const el = audioRef.current;
     if (!el) return;
@@ -53,7 +52,7 @@ const ListaPedidos = () => {
     }
   }, [alarmaActiva]);
 
-  // 🔢 calcular cuántos productos caben en una columna, según altura de pantalla
+  // calcular cuántos productos caben en una columna, según altura de pantalla
   useEffect(() => {
     const calcItemsPerCol = () => {
       const h = window.innerHeight || 800;
@@ -69,7 +68,7 @@ const ListaPedidos = () => {
     return () => window.removeEventListener("resize", calcItemsPerCol);
   }, []);
 
-  // 🔊 escuchar pedidos
+  // escuchar pedidos
   useEffect(() => {
     const ref = collection(db, "pedidos");
     const q = query(ref, orderBy("fecha", "asc"));
@@ -141,13 +140,13 @@ const ListaPedidos = () => {
     [pedidos]
   );
 
+  // 👇 listos incluye status 2, 3 y texto "listo"
   const listos = useMemo(
     () =>
-      pedidos.filter(
-        (p) =>
-          String(p.status) === "2" ||
-          String(p.status).toLowerCase() === "listo"
-      ),
+      pedidos.filter((p) => {
+        const s = String(p.status).toLowerCase();
+        return s === "2" || s === "3" || s === "listo";
+      }),
     [pedidos]
   );
 
@@ -297,7 +296,7 @@ const ListaPedidos = () => {
       )}
 
       {/* HEADER */}
-      <header className="flex items-center justify-between mb-4">
+      <header className="flex items-center justify_between md:justify-between mb-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight">
             Cocina Don Burgo
@@ -350,7 +349,6 @@ const ListaPedidos = () => {
 
             const columnasProductos = dividirProductosEnColumnas(items);
 
-            // 👉 total de productos del pedido
             const totalProductos = items.reduce(
               (acc, it) => acc + (it.cantidad || 1),
               0
