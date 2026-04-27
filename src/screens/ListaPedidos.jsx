@@ -6,6 +6,7 @@ import {
   orderBy,
   onSnapshot,
   updateDoc,
+  deleteDoc,
   doc,
   serverTimestamp,
 } from "firebase/firestore";
@@ -32,6 +33,12 @@ const ListaPedidos = () => {
 
   // modal de pedidos listos
   const [mostrarModalListos, setMostrarModalListos] = useState(false);
+
+  // modal eliminar pedido
+  const [mostrarModalEliminar, setMostrarModalEliminar] = useState(false);
+  const [pedidoAEliminar, setPedidoAEliminar] = useState(null);
+  const [pinIngresado, setPinIngresado] = useState("");
+  const [errorPin, setErrorPin] = useState(false);
 
   // cuántos productos caben de arriba a abajo en una columna
   const [itemsPerCol, setItemsPerCol] = useState(8);
@@ -162,6 +169,35 @@ const ListaPedidos = () => {
     }
   };
 
+  const abrirModalEliminar = (pedido) => {
+    setPedidoAEliminar(pedido);
+    setPinIngresado("");
+    setErrorPin(false);
+    setMostrarModalEliminar(true);
+  };
+
+  const cerrarModalEliminar = () => {
+    setMostrarModalEliminar(false);
+    setPedidoAEliminar(null);
+    setPinIngresado("");
+    setErrorPin(false);
+  };
+
+  const confirmarEliminar = async () => {
+    if (pinIngresado !== atob("MTAxMA==")) {
+      setErrorPin(true);
+      setPinIngresado("");
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, "pedidos", pedidoAEliminar.id));
+      cerrarModalEliminar();
+    } catch (e) {
+      console.error(e);
+      alert("No se pudo eliminar el pedido. Revisa la conexión.");
+    }
+  };
+
   const formatearHora = (fecha) => {
     try {
       if (!fecha) return "";
@@ -281,6 +317,63 @@ const ListaPedidos = () => {
                 className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] text-lg font-bold text-black"
               >
                 ACEPTAR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL ELIMINAR PEDIDO */}
+      {mostrarModalEliminar && pedidoAEliminar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75">
+          <div className="bg-slate-900 rounded-2xl shadow-2xl border border-red-500/70 max-w-sm w-full mx-4">
+            <div className="px-5 pt-5 pb-3">
+              <h2 className="text-xl font-extrabold text-red-400 mb-1">
+                Eliminar pedido
+              </h2>
+              <p className="text-sm text-slate-300">
+                Pedido #{pedidoAEliminar.id.slice(-6).toUpperCase()} —{" "}
+                {pedidoAEliminar.infoCliente?.nombre || "Sin nombre"}
+              </p>
+              <p className="text-sm text-slate-400 mt-2">
+                Ingresa el PIN de gerente para continuar.
+              </p>
+            </div>
+
+            <div className="px-5 pb-2">
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={6}
+                value={pinIngresado}
+                onChange={(e) => {
+                  setPinIngresado(e.target.value);
+                  setErrorPin(false);
+                }}
+                onKeyDown={(e) => e.key === "Enter" && confirmarEliminar()}
+                placeholder="PIN"
+                className="w-full rounded-lg bg-slate-800 border border-slate-600 text-white text-center text-2xl tracking-widest py-2 px-3 focus:outline-none focus:border-red-400"
+                autoFocus
+              />
+              {errorPin && (
+                <p className="text-red-400 text-sm text-center mt-2">
+                  PIN incorrecto. Intenta de nuevo.
+                </p>
+              )}
+            </div>
+
+            <div className="px-5 pb-5 pt-3 flex gap-3">
+              <button
+                onClick={cerrarModalEliminar}
+                className="flex-1 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarEliminar}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm"
+              >
+                Eliminar
               </button>
             </div>
           </div>
@@ -426,13 +519,19 @@ const ListaPedidos = () => {
                   )}
                 </div>
 
-                <div className="bg-slate-900 px-3 pb-3 pt-2">
+                <div className="bg-slate-900 px-3 pb-3 pt-2 flex gap-2">
                   <button
                     onClick={() => marcarComoListo(p.id)}
-                    className="w-full py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-sm flex items-center justify-center gap-2"
+                    className="flex-1 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-sm flex items-center justify-center gap-2"
                   >
                     <FaCheck />
                     Pedido listo
+                  </button>
+                  <button
+                    onClick={() => abrirModalEliminar(p)}
+                    className="py-2.5 px-3 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-sm"
+                  >
+                    Eliminar
                   </button>
                 </div>
               </article>

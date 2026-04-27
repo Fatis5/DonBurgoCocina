@@ -66,39 +66,19 @@ const filtrarPorRango = (pedidos, filtro, fechaDesdeStr, fechaHastaStr) => {
   });
 };
 
-// Intenta leer el total del pedido de distintos campos posibles
-// Intenta leer el total del pedido o lo calcula desde el carrito
+const COSTO_ENVIO = 10;
+
+// Calcula el total del pedido desde el carrito
 const getTotalPedido = (p) => {
-  // 1) Si ya tienes algún total guardado en el documento, úsalo
-  const posiblesCamposTotal = [
-    p.total,
-    p.totalPagar,
-    p.totalPedido,
-    p.totalPedidoConDescuento,
-  ];
-
-  for (const valor of posiblesCamposTotal) {
-    const n = Number(valor);
-    if (!Number.isNaN(n) && n > 0) {
-      return n;
-    }
-  }
-
-  // 2) Si no hay total guardado, lo calculamos desde el carrito
   const items = p.nuevoCarrito || p.carrito || [];
   const subtotal = items.reduce((acc, it) => {
     const precio = Number(it.precio || 0);
     const cantidad = Number(it.cantidad || 1);
-
     if (Number.isNaN(precio) || Number.isNaN(cantidad)) return acc;
     return acc + precio * cantidad;
   }, 0);
 
-  // Sumamos costo de envío si existe
-  const envio = Number(p.costoEnvio || 0);
-  const envioSeguro = Number.isNaN(envio) ? 0 : envio;
-
-  return subtotal + envioSeguro;
+  return subtotal + COSTO_ENVIO;
 };
 
 
