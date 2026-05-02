@@ -198,7 +198,6 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
 
     pedidosMetodo.forEach((p) => {
       const items = p.nuevoCarrito || p.carrito || [];
-      totalMonto += getTotalPedido(p);
 
       items.forEach((it) => {
         const key =
@@ -206,12 +205,17 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
         const cantidad = it.cantidad || 1;
         totalProd += cantidad;
 
+        const itemSubtotal = (Number(it.precio) || 0) * cantidad + COSTO_ENVIO;
+        totalMonto += itemSubtotal;
+
         const previo = mapProductos.get(key) || {
           id: key,
           nombre: key,
           cantidad: 0,
+          subtotal: 0,
         };
         previo.cantidad += cantidad;
+        previo.subtotal += itemSubtotal;
         mapProductos.set(key, previo);
       });
     });
@@ -656,7 +660,10 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
                             Producto
                           </th>
                           <th className="text-right px-3 py-2 text-[11px] text-slate-400">
-                            Cantidad
+                            Cant.
+                          </th>
+                          <th className="text-right px-3 py-2 text-[11px] text-slate-400">
+                            Total
                           </th>
                         </tr>
                       </thead>
@@ -669,8 +676,11 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
                             <td className="px-3 py-1.5">
                               {prod.nombre.replace(/-/g, " ").toUpperCase()}
                             </td>
-                            <td className="px-3 py-1.5 text-right font-bold">
-                              {prod.cantidad}
+                            <td className="px-3 py-1.5 text-right font-bold text-slate-300">
+                              x{prod.cantidad}
+                            </td>
+                            <td className="px-3 py-1.5 text-right font-bold text-emerald-400">
+                              {currency(prod.subtotal)}
                             </td>
                           </tr>
                         ))}
