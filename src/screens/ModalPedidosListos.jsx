@@ -205,16 +205,19 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
         const cantidad = it.cantidad || 1;
         totalProd += cantidad;
 
-        const itemSubtotal = (Number(it.precio) || 0) * cantidad + COSTO_ENVIO;
+        const precioUnit = (Number(it.precio) || 0) + COSTO_ENVIO;
+        const itemSubtotal = precioUnit * cantidad;
         totalMonto += itemSubtotal;
 
         const previo = mapProductos.get(key) || {
           id: key,
           nombre: key,
           cantidad: 0,
+          precioUnit,
           subtotal: 0,
         };
         previo.cantidad += cantidad;
+        previo.precioUnit = precioUnit;
         previo.subtotal += itemSubtotal;
         mapProductos.set(key, previo);
       });
@@ -271,10 +274,10 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70">
-      <div className="bg-slate-900 rounded-2xl shadow-2xl border border-emerald-500/60 max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/70">
+      <div className="bg-slate-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-emerald-500/60 w-full sm:max-w-4xl sm:mx-4 max-h-[95dvh] sm:max-h-[90vh] flex flex-col">
         {/* HEADER */}
-        <div className="flex items-start justify-between px-5 pt-4 pb-2 border-b border-slate-700/70">
+        <div className="flex items-start justify-between px-3 sm:px-5 pt-4 pb-2 border-b border-slate-700/70">
           <div>
             <h2 className="text-xl md:text-2xl font-extrabold text-white">
               Pedidos listos (status = 2 y 3)
@@ -292,7 +295,7 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
         </div>
 
         {/* FILTROS */}
-        <div className="px-5 pt-3 pb-2 border-b border-slate-800 flex flex-col gap-2">
+        <div className="px-3 sm:px-5 pt-3 pb-2 border-b border-slate-800 flex flex-col gap-2">
           <div className="flex flex-wrap gap-2">
             {filtros.map((f) => (
               <button
@@ -338,7 +341,7 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
         </div>
 
         {/* RESUMEN GLOBAL */}
-        <div className="px-5 py-3 border-b border-slate-800 text-sm text-slate-200 flex flex-wrap gap-4">
+        <div className="px-3 sm:px-5 py-2 sm:py-3 border-b border-slate-800 text-sm text-slate-200 flex flex-wrap gap-3 sm:gap-4">
           <span>
             <b>Pedidos listos:</b> {totalPedidos}
           </span>
@@ -348,7 +351,7 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
         </div>
 
         {/* RESUMEN POR MÉTODO DE PAGO */}
-        <div className="px-5 pb-3 border-b border-slate-800 text-xs md:text-sm text-slate-200">
+        <div className="px-3 sm:px-5 pb-2 sm:pb-3 border-b border-slate-800 text-xs md:text-sm text-slate-200">
           <p className="font-semibold mb-1">Por método de pago:</p>
           {resumenMetodos.length === 0 ? (
             <p className="text-slate-500 text-xs">
@@ -379,7 +382,7 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
         </div>
 
         {/* CONTENIDO PRINCIPAL */}
-        <div className="flex-1 overflow-auto px-5 py-4 flex flex-col md:flex-row gap-4">
+        <div className="flex-1 overflow-auto px-3 sm:px-5 py-3 sm:py-4 flex flex-col md:flex-row gap-4">
           {/* Tabla de productos */}
           <div className="md:w-2/3">
             <h3 className="text-sm font-semibold text-slate-300 mb-2">
@@ -390,8 +393,8 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
                 No hay pedidos listos en este período.
               </p>
             ) : (
-              <div className="bg-slate-950/60 rounded-xl border border-slate-800 max-h-[280px] overflow-auto">
-                <table className="w-full text-sm">
+              <div className="bg-slate-950/60 rounded-xl border border-slate-800 max-h-[35vh] overflow-auto">
+                <table className="w-full text-xs sm:text-sm">
                   <thead className="sticky top-0 bg-slate-900">
                     <tr>
                       <th className="text-left px-3 py-2 text-xs text-slate-400">
@@ -432,7 +435,7 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
                 No hay pedidos listos en este período.
               </p>
             ) : (
-              <div className="bg-slate-950/60 rounded-xl border border-slate-800 max-h-[280px] overflow-auto text-xs">
+              <div className="bg-slate-950/60 rounded-xl border border-slate-800 max-h-[35vh] overflow-auto text-xs">
                 <ul>
                   {pedidosFiltrados.map((p) => {
                     const { label: metodoLabel } = normalizarMetodoPago(p);
@@ -461,7 +464,7 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
         </div>
 
         {/* BOTÓN CERRAR */}
-        <div className="px-5 pb-4 pt-2 border-t border-slate-800">
+        <div className="px-3 sm:px-5 pb-4 pt-2 border-t border-slate-800">
           <button
             onClick={onClose}
             className="ml-auto block px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-sm font-semibold"
@@ -473,10 +476,10 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
 
       {/* MODAL DETALLE DE UN PEDIDO */}
       {pedidoDetalle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="bg-slate-900 rounded-2xl shadow-2xl border border-emerald-500/70 max-w-md w-full mx-4 max-h-[85vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70">
+          <div className="bg-slate-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-emerald-500/70 w-full sm:max-w-md sm:mx-4 max-h-[90dvh] sm:max-h-[85vh] flex flex-col">
             {/* Header detalle */}
-            <div className="flex items-start justify-between px-5 pt-4 pb-2 border-b border-slate-800">
+            <div className="flex items-start justify-between px-3 sm:px-5 pt-4 pb-2 border-b border-slate-800">
               <div>
                 <p className="text-sm text-emerald-300 font-semibold">
                   Pedido #{pedidoDetalle.id.slice(-6).toUpperCase()}
@@ -497,7 +500,7 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
             </div>
 
             {/* Contenido detalle */}
-            <div className="flex-1 overflow-auto px-5 py-3 text-sm text-slate-100">
+            <div className="flex-1 overflow-auto px-3 sm:px-5 py-3 text-sm text-slate-100">
               <p className="text-xs text-slate-400 uppercase mb-1">
                 Cliente
               </p>
@@ -569,7 +572,7 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
             </div>
 
             {/* Cerrar detalle */}
-            <div className="px-5 pb-4 pt-2 border-t border-slate-800">
+            <div className="px-3 sm:px-5 pb-4 pt-2 border-t border-slate-800">
               <button
                 onClick={() => setPedidoDetalle(null)}
                 className="ml-auto block px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-sm font-semibold text-black"
@@ -583,16 +586,13 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
 
       {/* MODAL RESUMEN POR MÉTODO DE PAGO */}
       {metodoSeleccionado && resumenMetodoSeleccionado && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="bg-slate-900 rounded-2xl shadow-2xl border border-emerald-500/70 max-w-lg w-full mx-4 max-h-[85vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center landscape:items-center justify-center bg-black/70">
+          <div className="bg-slate-900 rounded-t-2xl sm:rounded-2xl landscape:rounded-2xl shadow-2xl border border-emerald-500/70 w-full sm:max-w-lg landscape:max-w-[95vw] landscape:w-[95vw] sm:mx-4 max-h-[90dvh] landscape:max-h-[95dvh] flex flex-col">
             {/* Header */}
-            <div className="flex items-start justify-between px-5 pt-4 pb-2 border-b border-slate-800">
+            <div className="flex items-center justify-between px-3 sm:px-5 pt-3 landscape:pt-2 pb-2 border-b border-slate-800">
               <div>
                 <p className="text-xs text-emerald-300 uppercase font-semibold">
-                  Resumen por método de pago
-                </p>
-                <p className="text-lg font-bold">
-                  {metodoSeleccionado.label}
+                  Resumen · {metodoSeleccionado.label}
                 </p>
                 <p className="text-xs text-slate-400">
                   {filtro === "hoy"
@@ -608,80 +608,55 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
               </div>
               <button
                 onClick={() => setMetodoSeleccionado(null)}
-                className="ml-3 mt-1 text-slate-300 hover:text-white"
+                className="ml-3 text-slate-300 hover:text-white p-1"
               >
                 <FaTimes />
               </button>
             </div>
 
-            {/* Contenido */}
-            <div className="flex-1 overflow-auto px-5 py-3 text-sm text-slate-100 space-y-3">
-              <div className="flex flex-wrap gap-3 text-xs md:text-sm">
-                <div className="px-3 py-2 bg-slate-800 rounded-xl border border-slate-700">
-                  <p className="text-slate-400 text-[11px] uppercase">
-                    Pedidos
-                  </p>
-                  <p className="text-base font-bold">
-                    {resumenMetodoSeleccionado.totalPedidos}
-                  </p>
+            {/* Contenido — landscape: dos columnas */}
+            <div className="flex-1 overflow-hidden flex flex-col landscape:flex-row">
+              {/* Stats */}
+              <div className="px-3 sm:px-5 py-3 landscape:py-2 flex flex-row landscape:flex-col gap-2 landscape:w-40 landscape:border-r landscape:border-slate-800 landscape:overflow-auto landscape:shrink-0">
+                <div className="px-3 py-2 bg-slate-800 rounded-xl border border-slate-700 flex-1 landscape:flex-none">
+                  <p className="text-slate-400 text-[10px] uppercase">Pedidos</p>
+                  <p className="text-base font-bold">{resumenMetodoSeleccionado.totalPedidos}</p>
                 </div>
-                <div className="px-3 py-2 bg-slate-800 rounded-xl border border-slate-700">
-                  <p className="text-slate-400 text-[11px] uppercase">
-                    Productos
-                  </p>
-                  <p className="text-base font-bold">
-                    {resumenMetodoSeleccionado.totalProductos}
-                  </p>
+                <div className="px-3 py-2 bg-slate-800 rounded-xl border border-slate-700 flex-1 landscape:flex-none">
+                  <p className="text-slate-400 text-[10px] uppercase">Productos</p>
+                  <p className="text-base font-bold">{resumenMetodoSeleccionado.totalProductos}</p>
                 </div>
-                <div className="px-3 py-2 bg-emerald-600/20 rounded-xl border border-emerald-400">
-                  <p className="text-emerald-300 text-[11px] uppercase">
-                    Total vendido
-                  </p>
-                  <p className="text-base font-extrabold text-emerald-200">
-                    {currency(resumenMetodoSeleccionado.totalMonto)}
-                  </p>
+                <div className="px-3 py-2 bg-emerald-600/20 rounded-xl border border-emerald-400 flex-1 landscape:flex-none">
+                  <p className="text-emerald-300 text-[10px] uppercase">Total</p>
+                  <p className="text-base font-extrabold text-emerald-200">{currency(resumenMetodoSeleccionado.totalMonto)}</p>
                 </div>
               </div>
 
-              <div>
-                <p className="text-xs text-slate-400 uppercase mb-1">
+              {/* Tabla */}
+              <div className="flex-1 overflow-auto px-3 sm:px-5 landscape:px-3 pb-2">
+                <p className="text-[10px] text-slate-400 uppercase mb-1 pt-1">
                   Productos vendidos por {metodoSeleccionado.label}
                 </p>
                 {resumenMetodoSeleccionado.productos.length === 0 ? (
-                  <p className="text-xs text-slate-500">
-                    No hay productos en este período para este método.
-                  </p>
+                  <p className="text-xs text-slate-500">No hay productos en este período.</p>
                 ) : (
-                  <div className="bg-slate-950/60 rounded-xl border border-slate-800 max-h-[220px] overflow-auto">
-                    <table className="w-full text-xs">
+                  <div className="bg-slate-950/60 rounded-xl border border-slate-800 overflow-auto h-full max-h-[35vh] landscape:max-h-full">
+                    <table className="w-full min-w-[280px] text-xs">
                       <thead className="sticky top-0 bg-slate-900">
                         <tr>
-                          <th className="text-left px-3 py-2 text-[11px] text-slate-400">
-                            Producto
-                          </th>
-                          <th className="text-right px-3 py-2 text-[11px] text-slate-400">
-                            Cant.
-                          </th>
-                          <th className="text-right px-3 py-2 text-[11px] text-slate-400">
-                            Total
-                          </th>
+                          <th className="text-left px-3 py-2 text-[11px] text-slate-400">Producto</th>
+                          <th className="text-right px-3 py-2 text-[11px] text-slate-400">P. Unit</th>
+                          <th className="text-right px-3 py-2 text-[11px] text-slate-400">Cant.</th>
+                          <th className="text-right px-3 py-2 text-[11px] text-slate-400">Total</th>
                         </tr>
                       </thead>
                       <tbody>
                         {resumenMetodoSeleccionado.productos.map((prod) => (
-                          <tr
-                            key={prod.id}
-                            className="border-t border-slate-800/70"
-                          >
-                            <td className="px-3 py-1.5">
-                              {prod.nombre.replace(/-/g, " ").toUpperCase()}
-                            </td>
-                            <td className="px-3 py-1.5 text-right font-bold text-slate-300">
-                              x{prod.cantidad}
-                            </td>
-                            <td className="px-3 py-1.5 text-right font-bold text-emerald-400">
-                              {currency(prod.subtotal)}
-                            </td>
+                          <tr key={prod.id} className="border-t border-slate-800/70">
+                            <td className="px-3 py-1.5">{prod.nombre.replace(/-/g, " ").toUpperCase()}</td>
+                            <td className="px-3 py-1.5 text-right text-slate-400">{currency(prod.precioUnit)}</td>
+                            <td className="px-3 py-1.5 text-right font-bold text-slate-300">x{prod.cantidad}</td>
+                            <td className="px-3 py-1.5 text-right font-bold text-emerald-400">{currency(prod.subtotal)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -692,12 +667,12 @@ const ModalPedidosListos = ({ pedidos = [], onClose }) => {
             </div>
 
             {/* Footer */}
-            <div className="px-5 pb-4 pt-2 border-t border-slate-800">
+            <div className="px-3 sm:px-5 pb-3 landscape:pb-2 pt-2 border-t border-slate-800">
               <button
                 onClick={() => setMetodoSeleccionado(null)}
                 className="ml-auto block px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-sm font-semibold text-black"
               >
-                Cerrar resumen
+                Cerrar
               </button>
             </div>
           </div>
